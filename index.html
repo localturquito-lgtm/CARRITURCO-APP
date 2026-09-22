@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carriturco - Control de Stock y Ventas</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 15px; color: #333; }
+        h1, h2 { text-align: center; color: #d9534f; }
+        .card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        label { font-weight: bold; display: block; margin-top: 10px; }
+        input, select, button { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        button { background-color: #28a745; color: white; border: none; font-weight: bold; margin-top: 15px; cursor: pointer; }
+        button:hover { background-color: #218838; }
+        .btn-cierre { background-color: #dc3545; }
+        .btn-cierre:hover { background-color: #c82333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #f2f2f2; }
+        .stock-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .stock-item input, .stock-item select { width: 45%; }
+    </style>
+</head>
+<body>
+
+    <h1>🛒 Carriturco</h1>
+
+    <!-- SELECCIÓN DE FECHA Y VENTA DEL DÍA -->
+    <div class="card">
+        <h2>📅 Registro Diario</h2>
+        <label for="fecha">Fecha:</label>
+        <input type="date" id="fecha">
+
+        <label for="ventaDia">Venta total del día ($):</label>
+        <input type="number" id="ventaDia" placeholder="0.00">
+        <button onclick="guardarVentaDia()">Guardar Venta del Día</button>
+    </div>
+
+    <!-- CONTROL DE STOCK -->
+    <div class="card">
+        <h2>📦 Inventario / Stock</h2>
+        
+        <div class="stock-item"><label>Pan p/pancho (UN):</label><input type="number" id="stk_pan_pancho"></div>
+        <div class="stock-item"><label>Pan p/hambur (UN):</label><input type="number" id="stk_pan_hambur"></div>
+        <div class="stock-item"><label>Paty (UN):</label><input type="number" id="stk_paty"></div>
+        <div class="stock-item"><label>Salchichas (UN):</label><input type="number" id="stk_salchichas"></div>
+        <div class="stock-item"><label>Cheddar fetas (UN):</label><input type="number" id="stk_cheddar_fetas"></div>
+        <div class="stock-item"><label>Papas Bastón (KG):</label><input type="number" step="0.1" id="stk_papas_baston"></div>
+        <div class="stock-item"><label>Papas Pay (UN):</label><input type="number" id="stk_papas_pay"></div>
+
+        <h3>🥫 Salsas e Insumos</h3>
+        <div class="stock-item">
+            <label>Mayonesa:</label>
+            <select id="stk_mayonesa">
+                <option value="SI">SI</option>
+                <option value="NO">NO</option>
+                <option value="COMPRAR">COMPRAR</option>
+            </select>
+        </div>
+        <div class="stock-item">
+            <label>Ketchup:</label>
+            <select id="stk_ketchup">
+                <option value="SI">SI</option>
+                <option value="NO">NO</option>
+                <option value="COMPRAR">COMPRAR</option>
+            </select>
+        </div>
+        <div class="stock-item">
+            <label>Savora:</label>
+            <select id="stk_savora">
+                <option value="SI">SI</option>
+                <option value="NO">NO</option>
+                <option value="COMPRAR">COMPRAR</option>
+            </select>
+        </div>
+        <div class="stock-item">
+            <label>Cheddar:</label>
+            <select id="stk_cheddar">
+                <option value="SI">SI</option>
+                <option value="NO">NO</option>
+                <option value="COMPRAR">COMPRAR</option>
+            </select>
+        </div>
+
+        <button onclick="guardarStock()">Guardar Stock</button>
+    </div>
+
+    <!-- REGISTRO DE GASTOS -->
+    <div class="card">
+        <h2>💸 Gastos Diarios</h2>
+        <label for="gastoDetalle">Detalle del Gasto:</label>
+        <input type="text" id="gastoDetalle" placeholder="Ej: Mercadería, Gas, Bebidas">
+        
+        <label for="gastoMonto">Monto ($):</label>
+        <input type="number" id="gastoMonto" placeholder="0.00">
+        
+        <button onclick="agregarGasto()">Agregar Gasto</button>
+
+        <h3>Lista de Gastos Registrados</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Detalle</th>
+                    <th>Monto ($)</th>
+                </tr>
+            </thead>
+            <tbody id="tablaGastos"></tbody>
+        </table>
+    </div>
+
+    <!-- CIERRE DE SEMANA Y RESUMEN -->
+    <div class="card">
+        <h2>📊 Cierre de Semana</h2>
+        <p><strong>Total Ventas Semana:</strong> $<span id="totalVentasSemana">0</span></p>
+        <p><strong>Total Gastos Semana:</strong> $<span id="totalGastosSemana">0</span></p>
+        <p><strong>Balance / Ganancia Neta:</strong> $<span id="balanceSemana">0</span></p>
+        <button class="btn-cierre" onclick="cierreDeSemana()">Realizar Cierre de Semana</button>
+    </div>
+
+    <script>
+        // Establecer fecha de hoy por defecto
+        document.getElementById('fecha').valueAsDate = new Date();
+
+        function obtenerDatos() {
+            return JSON.parse(localStorage.getItem('carriturco_db')) || { ventas: [], gastos: [], stock: {} };
+        }
+
+        function guardarDatos(data) {
+            localStorage.setItem('carriturco_db', JSON.stringify(data));
+            actualizarResumen();
+        }
+
+        function guardarVentaDia() {
+            const fecha = document.getElementById('fecha').value;
+            const monto = parseFloat(document.getElementById('ventaDia').value) || 0;
+            if(!fecha) return alert('Por favor selecciona una fecha');
+
+            let db = obtenerDatos();
+            db.ventas.push({ fecha, monto });
+            guardarDatos(db);
+            alert('Venta guardada exitosamente');
+            document.getElementById('ventaDia').value = '';
+        }
+
+        function agregarGasto() {
+            const fecha = document.getElementById('fecha').value;
+            const detalle = document.getElementById('gastoDetalle').value;
+            const monto = parseFloat(document.getElementById('gastoMonto').value) || 0;
+
+            if(!fecha || !detalle || !monto) return alert('Completa todos los campos del gasto');
+
+            let db = obtenerDatos();
+            db.gastos.push({ fecha, detalle, monto });
+            guardarDatos(db);
+
+            document.getElementById('gastoDetalle').value = '';
+            document.getElementById('gastoMonto').value = '';
+            renderGastos();
+        }
+
+        function guardarStock() {
+            let db = obtenerDatos();
+            db.stock = {
+                pan_pancho: document.getElementById('stk_pan_pancho').value,
+                pan_hambur: document.getElementById('stk_pan_hambur').value,
+                paty: document.getElementById('stk_paty').value,
+                salchichas: document.getElementById('stk_salchichas').value,
+                cheddar_fetas: document.getElementById('stk_cheddar_fetas').value,
+                papas_baston: document.getElementById('stk_papas_baston').value,
+                papas_pay: document.getElementById('stk_papas_pay').value,
+                mayonesa: document.getElementById('stk_mayonesa').value,
+                ketchup: document.getElementById('stk_ketchup').value,
+                savora: document.getElementById('stk_savora').value,
+                cheddar: document.getElementById('stk_cheddar').value
+            };
+            guardarDatos(db);
+            alert('Stock actualizado');
+        }
+
+        function renderGastos() {
+            let db = obtenerDatos();
+            let tbody = document.getElementById('tablaGastos');
+            tbody.innerHTML = '';
+            db.gastos.forEach(g => {
+                let row = `<tr><td>${g.fecha}</td><td>${g.detalle}</td><td>$${g.monto}</td></tr>`;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function actualizarResumen() {
+            let db = obtenerDatos();
+            let totalVentas = db.ventas.reduce((acc, curr) => acc + curr.monto, 0);
+            let totalGastos = db.gastos.reduce((acc, curr) => acc + curr.monto, 0);
+
+            document.getElementById('totalVentasSemana').innerText = totalVentas;
+            document.getElementById('totalGastosSemana').innerText = totalGastos;
+            document.getElementById('balanceSemana').innerText = totalVentas - totalGastos;
+        }
+
+        function cierreDeSemana() {
+            if(confirm('¿Estás seguro de realizar el cierre de semana? Esto reiniciará las ventas y gastos registrados.')) {
+                let db = obtenerDatos();
+                db.ventas = [];
+                db.gastos = [];
+                guardarDatos(db);
+                renderGastos();
+                alert('Semana cerrada con éxito');
+            }
+        }
+
+        // Cargar datos al abrir la página
+        window.onload = function() {
+            renderGastos();
+            actualizarResumen();
+            let db = obtenerDatos();
+            if(db.stock) {
+                if(db.stock.pan_pancho) document.getElementById('stk_pan_pancho').value = db.stock.pan_pancho;
+                if(db.stock.pan_hambur) document.getElementById('stk_pan_hambur').value = db.stock.pan_hambur;
+                if(db.stock.paty) document.getElementById('stk_paty').value = db.stock.paty;
+                if(db.stock.salchichas) document.getElementById('stk_salchichas').value = db.stock.salchichas;
+                if(db.stock.cheddar_fetas) document.getElementById('stk_cheddar_fetas').value = db.stock.cheddar_fetas;
+                if(db.stock.papas_baston) document.getElementById('stk_papas_baston').value = db.stock.papas_baston;
+                if(db.stock.papas_pay) document.getElementById('stk_papas_pay').value = db.stock.papas_pay;
+                if(db.stock.mayonesa) document.getElementById('stk_mayonesa').value = db.stock.mayonesa;
+                if(db.stock.ketchup) document.getElementById('stk_ketchup').value = db.stock.ketchup;
+                if(db.stock.savora) document.getElementById('stk_savora').value = db.stock.savora;
+                if(db.stock.cheddar) document.getElementById('stk_cheddar').value = db.stock.cheddar;
+            }
+        };
+    </script>
+</body>
+</html>
