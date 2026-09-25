@@ -18,7 +18,7 @@
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
         th { background-color: #f2f2f2; }
-        .stock-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; flex-wrap: wrap; background: #fafafa; padding: 8px; border-radius: 5px; border: 1px solid #eee; }
+        .stock-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; flex-wrap: wrap; background: #fafafa; padding: 10px; border-radius: 5px; border: 1px solid #eee; }
         .stock-item label { flex: 1 1 100%; margin-top: 0; font-size: 15px; }
         .stock-item input[type="number"] { flex: 2; margin-top: 0; }
         .stock-item select { flex: 1; margin-top: 0; }
@@ -39,7 +39,7 @@
     <!-- ALERTAS DE STOCK BAJO -->
     <div id="alertaStock" class="alerta-stock"></div>
 
-    <!-- REGISTRO DIARIO DE VENTAS -->
+    <!-- REGISTRO DIARIO DE VENTAS Y FECHA -->
     <div class="card">
         <h2>📅 Registro Diario</h2>
         <label for="fecha">Fecha:</label>
@@ -59,11 +59,11 @@
 
         <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
 
-        <h3>➕ Agregar producto nuevo</h3>
+        <h3>➕ Agregar otro producto</h3>
         <input type="text" id="nuevoProdNombre" placeholder="Nombre del producto">
-        <select id="nuevoProdMedida">
-            <option value="UN">UN (Unidad)</option>
-            <option value="KG">KG (Kilos)</option>
+        <select id="nuevoProdTipo">
+            <option value="MEDIDA">Unidad / Kilos (UN/KG)</option>
+            <option value="ESTADO">Estado (SI / NO / COMPRAR)</option>
         </select>
         <button onclick="agregarNuevoProducto()" style="background-color: #17a2b8;">Agregar al Inventario</button>
     </div>
@@ -72,7 +72,7 @@
     <div class="card">
         <h2>💸 Gastos Diarios</h2>
         <label for="gastoDetalle">Detalle del Gasto:</label>
-        <input type="text" id="gastoDetalle" placeholder="Ej: Pan, Mercadería, Gas">
+        <input type="text" id="gastoDetalle" placeholder="Ej: Mercadería, Gas, Insumos">
         
         <label for="gastoMonto">Monto ($):</label>
         <input type="number" id="gastoMonto" placeholder="0.00">
@@ -120,27 +120,28 @@
     <script>
         document.getElementById('fecha').valueAsDate = new Date();
 
-        const productosBase = [
-            { id: 'pan_pancho', nombre: 'Pan p/pancho', cantidad: 0, unidad: 'UN' },
-            { id: 'pan_hambur', nombre: 'Pan p/hambur', cantidad: 0, unidad: 'UN' },
-            { id: 'paty', nombre: 'Paty', cantidad: 0, unidad: 'UN' },
-            { id: 'salchichas', nombre: 'Salchichas', cantidad: 0, unidad: 'UN' },
-            { id: 'cheddar_fetas', nombre: 'Cheddar (en fetas)', cantidad: 0, unidad: 'UN' },
-            { id: 'papas_baston', nombre: 'Papas Bastón', cantidad: 0, unidad: 'KG' },
-            { id: 'papas_pay', nombre: 'Papas Pay', cantidad: 0, unidad: 'UN' },
-            { id: 'mayonesa', nombre: 'Mayonesa', cantidad: 0, unidad: 'UN' },
-            { id: 'ketchup', nombre: 'Ketchup', cantidad: 0, unidad: 'UN' },
-            { id: 'savora', nombre: 'Savora', cantidad: 0, unidad: 'UN' },
-            { id: 'cheddar', nombre: 'Cheddar', cantidad: 0, unidad: 'UN' }
+        const productosListaInicial = [
+            { id: 'pan_superpancho', nombre: 'Pan p/superpancho', tipo: 'MEDIDA', cantidad: 0, unidad: 'UN' },
+            { id: 'pan_pancho', nombre: 'Pan p/pancho', tipo: 'MEDIDA', cantidad: 0, unidad: 'UN' },
+            { id: 'pan_hambur', nombre: 'Pan p/hambur', tipo: 'MEDIDA', cantidad: 0, unidad: 'UN' },
+            { id: 'salchicha', nombre: 'Salchicha', tipo: 'MEDIDA', cantidad: 0, unidad: 'UN' },
+            { id: 'paty', nombre: 'Paty', tipo: 'MEDIDA', cantidad: 0, unidad: 'UN' },
+            { id: 'papas_pay', nombre: 'Papas pay', tipo: 'MEDIDA', cantidad: 0, unidad: 'UN' },
+            { id: 'papas_baston', nombre: 'Papas bastón', tipo: 'MEDIDA', cantidad: 0, unidad: 'KG' },
+            { id: 'cheddar_fetas', nombre: 'Cheddar en fetas', tipo: 'MEDIDA', cantidad: 0, unidad: 'UN' },
+            { id: 'mayonesa', nombre: 'Mayonesa', tipo: 'ESTADO', estado: 'SI' },
+            { id: 'ketchup', nombre: 'Ketchup', tipo: 'ESTADO', estado: 'SI' },
+            { id: 'savora', nombre: 'Savora', tipo: 'ESTADO', estado: 'SI' },
+            { id: 'cheddar', nombre: 'Cheddar', tipo: 'ESTADO', estado: 'SI' }
         ];
 
         function obtenerDatos() {
             let data = JSON.parse(localStorage.getItem('carriturco_db'));
-            if (!data) {
+            if (!data || !data.productos) {
                 data = {
                     ventas: [],
                     gastos: [],
-                    productos: productosBase,
+                    productos: productosListaInicial,
                     historial: []
                 };
             }
@@ -160,16 +161,26 @@
             container.innerHTML = '';
 
             db.productos.forEach((p, index) => {
-                let html = `
-                <div class="stock-item">
-                    <label>${p.nombre}:</label>
+                let html = `<div class="stock-item"><label>${p.nombre}:</label>`;
+
+                if (p.tipo === 'ESTADO') {
+                    let est = p.estado || 'SI';
+                    html += `
+                    <select id="estado_${index}">
+                        <option value="SI" ${est === 'SI' ? 'selected' : ''}>SI</option>
+                        <option value="NO" ${est === 'NO' ? 'selected' : ''}>NO</option>
+                        <option value="COMPRAR" ${est === 'COMPRAR' ? 'selected' : ''}>COMPRAR</option>
+                    </select>`;
+                } else {
+                    html += `
                     <input type="number" step="0.1" id="cant_${index}" value="${p.cantidad !== undefined ? p.cantidad : 0}" placeholder="Cantidad">
                     <select id="medida_${index}">
                         <option value="UN" ${p.unidad === 'UN' ? 'selected' : ''}>UN</option>
                         <option value="KG" ${p.unidad === 'KG' ? 'selected' : ''}>KG</option>
-                    </select>
-                    <button class="btn-eliminar" onclick="eliminarProducto(${index})">✕</button>
-                </div>`;
+                    </select>`;
+                }
+
+                html += `<button class="btn-eliminar" onclick="eliminarProducto(${index})">✕</button></div>`;
                 container.innerHTML += html;
             });
         }
@@ -177,26 +188,36 @@
         function guardarStock() {
             let db = obtenerDatos();
             db.productos.forEach((p, index) => {
-                let cantEl = document.getElementById(`cant_${index}`);
-                let medidaEl = document.getElementById(`medida_${index}`);
-                if (cantEl && medidaEl) {
-                    p.cantidad = parseFloat(cantEl.value) || 0;
-                    p.unidad = medidaEl.value;
+                if (p.tipo === 'ESTADO') {
+                    let estEl = document.getElementById(`estado_${index}`);
+                    if (estEl) p.estado = estEl.value;
+                } else {
+                    let cantEl = document.getElementById(`cant_${index}`);
+                    let medidaEl = document.getElementById(`medida_${index}`);
+                    if (cantEl && medidaEl) {
+                        p.cantidad = parseFloat(cantEl.value) || 0;
+                        p.unidad = medidaEl.value;
+                    }
                 }
             });
             guardarDatos(db);
-            alert('Stock guardado correctamente');
+            alert('Stock guardado con éxito');
         }
 
         function agregarNuevoProducto() {
             let nombre = document.getElementById('nuevoProdNombre').value.trim();
-            let unidad = document.getElementById('nuevoProdMedida').value;
+            let tipo = document.getElementById('nuevoProdTipo').value;
 
             if (!nombre) return alert('Ingresa el nombre del producto');
 
             let db = obtenerDatos();
             let id = nombre.toLowerCase().replace(/ /g, '_');
-            db.productos.push({ id, nombre, cantidad: 0, unidad });
+            
+            if (tipo === 'ESTADO') {
+                db.productos.push({ id, nombre, tipo: 'ESTADO', estado: 'SI' });
+            } else {
+                db.productos.push({ id, nombre, tipo: 'MEDIDA', cantidad: 0, unidad: 'UN' });
+            }
             
             guardarDatos(db);
             renderStockUI();
@@ -204,7 +225,7 @@
         }
 
         function eliminarProducto(index) {
-            if (confirm('¿Deseas quitar este producto del inventario?')) {
+            if (confirm('¿Deseas eliminar este producto de la lista?')) {
                 let db = obtenerDatos();
                 db.productos.splice(index, 1);
                 guardarDatos(db);
@@ -273,7 +294,9 @@
             let alertas = [];
 
             db.productos.forEach(p => {
-                if (p.cantidad <= 2) {
+                if (p.tipo === 'ESTADO' && p.estado === 'COMPRAR') {
+                    alertas.push(`⚠️ Comprar urgente: ${p.nombre}`);
+                } else if (p.tipo === 'MEDIDA' && p.cantidad <= 2) {
                     alertas.push(`⚠️ Stock bajo de ${p.nombre}: Quedan ${p.cantidad} ${p.unidad}`);
                 }
             });
@@ -310,7 +333,7 @@
             }
         }
 
-        // SINCRONIZACIÓN EN LA NUBE CON JSONBIN
+        // SINCRONIZACIÓN NUBE CON JSONBIN
         function guardarConfigSync() {
             let key = document.getElementById('binKey').value.trim();
             localStorage.setItem('carriturco_bin_id', key);
@@ -326,7 +349,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-            } catch(e) { console.error('Error sincronizando:', e); }
+            } catch(e) { console.error('Error al sincronizar:', e); }
         }
 
         async function cargarDesdeNube() {
@@ -343,7 +366,7 @@
                     actualizarResumen();
                     verificarAlertas();
                 }
-            } catch(e) { console.error('Error cargando datos:', e); }
+            } catch(e) { console.error('Error al cargar de la nube:', e); }
         }
 
         window.onload = function() {
